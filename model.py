@@ -347,6 +347,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         r"encoder\.version",
         r"decoder\.version",
         r"lm_head\.weight",
+        r"lm_head_2\.weight",
     ]
 
     def __init__(self, config: PegasusConfig, topic_num=1024, vocab_size=2000):
@@ -357,6 +358,8 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
 
         # initial topic model
         self.topic_num = topic_num
+        self.lm_head_2 = nn.Linear(config.d_model, self.topic_num, bias=False)
+
         # todo: confirm the vocab_size for topic modeling
         self.topic_model = DecoderNetwork(vocab_size=vocab_size, bert_size=config.d_model,
                                           infnet="zeroshot", num_topics=self.topic_num, model_type='prodLDA',
@@ -470,7 +473,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         if topic_guided:
             #     lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(
             #         self.topic_model.topic_word))
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(
+            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.lm_head_2(outputs[0]), self.tm_head(
                 self.topic_model.topic_word))
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
