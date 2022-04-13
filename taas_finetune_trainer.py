@@ -15,7 +15,6 @@
 
 import logging
 import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
