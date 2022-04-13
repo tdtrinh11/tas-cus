@@ -359,13 +359,13 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         self.topic_num = topic_num
         # todo: confirm the vocab_size for topic modeling
         self.topic_model = DecoderNetwork(vocab_size=vocab_size, bert_size=config.d_model,
-                                          infnet="zeroshot", num_topics=self.topic_num, model_type='prodLDA',
+                                          infnet="combined", num_topics=self.topic_num, model_type='prodLDA',
                                           hidden_sizes=(100, 100), activation='relu',
                                           dropout=self.config.dropout, learn_priors=True)
         # transfer the topic modeling vocab to vocab size
         self.tm_head = nn.Linear(vocab_size, self.model.shared.num_embeddings, bias=False)
         # for model analysis: use an additional NN to transfer dimension
-        # self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
+        self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
 
         # Initialize weights
         self.init_weights()
@@ -453,7 +453,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         bow = bow.reshape(bow.shape[0], -1)
 
         # perform topic modeling - use "[CLS]" as the representation
-        prior_mean, prior_variance, posterior_mean, posterior_variance, posterior_log_variance, word_dists, h = self.topic_model( bow, outputs.encoder_last_hidden_state[::, 0])
+        prior_mean, prior_variance, posterior_mean, posterior_variance, posterior_log_variance, word_dists, h = self.topic_model(bow, outputs.encoder_last_hidden_state[::, 0])
 
         # outputs[0]: if the last hidden state from the decoder_outputs; size: torch.Size([bs, #(summary), d_model])
         # self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)
@@ -468,10 +468,8 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         # theta = self.topic_model.get_theta(bow, outputs.encoder_last_hidden_state[::, 0])
 
         if topic_guided:
-            #     lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(
-            #         self.topic_model.topic_word))
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(
-                self.topic_model.topic_word))
+            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(self.topic_model.topic_word))
+            # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word))
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
