@@ -182,7 +182,7 @@ def main():
         training_args.device,
         training_args.n_gpu,
         bool(training_args.parallel_mode == ParallelMode.DISTRIBUTED),
-        training_args.fp16,
+        training_args.fp32,
     )
     # Set the verbosity to info of the Transformers logger (on main process only):
     if is_main_process(training_args.local_rank):
