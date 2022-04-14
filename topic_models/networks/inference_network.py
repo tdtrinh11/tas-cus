@@ -130,7 +130,10 @@ class CombinedInferenceNetwork(nn.Module):
         latent_representation = self.adapt(latent_representation)
         num_beam = latent_representation.shape[0]/x.shape[0]
         if num_beam > 1:
-            x = torch.cat(tuple([x]*num_beam), 1)
+            temp = x
+            for _ in range(num_beam-1):
+                x = torch.cat((x, temp), 1)
+            del temp
         x = torch.cat((x, latent_representation), 1)
         x = self.input_layer(x)
 
