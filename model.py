@@ -365,7 +365,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         # transfer the topic modeling vocab to vocab size
         self.tm_head = nn.Linear(vocab_size, self.model.shared.num_embeddings, bias=False)
         # for model analysis: use an additional NN to transfer dimension
-        self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
+        # self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
 
         # Initialize weights
         self.init_weights()
@@ -468,8 +468,8 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         # theta = self.topic_model.get_theta(bow, outputs.encoder_last_hidden_state[::, 0])
 
         if topic_guided:
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(self.topic_model.topic_word))
-            # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word))
+            # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(self.topic_model.topic_word))
+            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word))
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
