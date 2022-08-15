@@ -83,10 +83,15 @@ class DecoderNetwork(nn.Module):
         # dropout on h
         self.drop_h = nn.Dropout(p=self.dropout)
 
+        # if activation == 'softplus':
+        #     self.activation_hidden = nn.Softplus()
+        # elif activation == 'relu':
+        #     self.activation_hidden = nn.ReLU()
+        self.activation_hidden = nn.ReLU()
         self.hiddens = nn.Sequential(OrderedDict([
-            ('l_1', nn.Sequential(nn.Linear(num_topics, 100), self.activation)),
-            ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation)),
-            ('l_3', nn.Sequential(nn.Linear(100, num_topics), self.activation))
+            ('l_1', nn.Sequential(nn.Linear(num_topics, 100), self.activation_hidden)),
+            ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation_hidden)),
+            ('l_3', nn.Sequential(nn.Linear(100, num_topics), self.activation_hidden))
         ]))
 
     @staticmethod
