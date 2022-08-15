@@ -83,11 +83,17 @@ class DecoderNetwork(nn.Module):
         # dropout on h
         self.drop_h = nn.Dropout(p=self.dropout)
 
-        self.hiddens = nn.Sequential(OrderedDict([
-            ('l_1', nn.Sequential(nn.Linear(num_topics, 100), self.activation)),
-            ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation)),
-            ('l_3', nn.Sequential(nn.Linear(100, num_topics), self.activation))
-        ]))
+        # self.hiddens = nn.Sequential(OrderedDict([
+        #     ('l_1', nn.Sequential(nn.Linear(num_topics, 100), self.activation)),
+        #     ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation)),
+        #     ('l_3', nn.Sequential(nn.Linear(100, num_topics), self.activation))
+        # ]))
+
+        self.hiddens = nn.Sequential(
+            nn.Sequential(nn.Linear(num_topics, 100), self.activation),
+            nn.Sequential(nn.Linear(100, 100), self.activation),
+            nn.Sequential(nn.Linear(100, num_topics), self.activation)
+        )
 
     @staticmethod
     def reparameterize(mu, logvar):
