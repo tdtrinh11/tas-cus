@@ -7,6 +7,7 @@ PyTorch class for feed forward AVITM network.
 import torch
 from torch import nn
 from torch.nn import functional as F
+from collections import OrderedDict
 
 from topic_models.networks.inference_network import CombinedInferenceNetwork, ContextualInferenceNetwork
 
@@ -82,6 +83,17 @@ class DecoderNetwork(nn.Module):
         # dropout on h
         self.drop_h = nn.Dropout(p=self.dropout)
 
+        # if activation == 'softplus':
+        #     self.activation_hidden = nn.Softplus()
+        # elif activation == 'relu':
+        #     self.activation_hidden = nn.ReLU()
+        self.activation_hidden = nn.ReLU()
+        self.hiddens = nn.Sequential(OrderedDict([
+            ('l_1', nn.Sequential(nn.Linear(num_topics, 100), self.activation_hidden)),
+            ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation_hidden)),
+            ('l_3', nn.Sequential(nn.Linear(100, num_topics), self.activation_hidden))
+        ]))
+
     @staticmethod
     def reparameterize(mu, logvar):
         """Reparameterize the h distribution."""
@@ -98,8 +110,12 @@ class DecoderNetwork(nn.Module):
         posterior_mu, posterior_log_sigma = self.inf_net(x, latent_representation)
         posterior_sigma = torch.exp(posterior_log_sigma)
 
+        # batch_size x num_topics
+        z = self.reparameterize(posterior_mu, posterior_log_sigma)
+        z = self.hiddens(z)
+
         # generate samples from h - h.size: batch_size * num_topics
-        h = F.softmax(self.reparameterize(posterior_mu, posterior_log_sigma), dim=1)
+        h = F.softmax(z, dim=1)
         h = self.drop_h(h)
 
         # prodLDA vs LDA
@@ -111,7 +127,7 @@ class DecoderNetwork(nn.Module):
             self.topic_word = F.softmax(self.topic_word_batchnorm(self.topic_word), dim=1)
             word_dist = torch.matmul(h, self.topic_word)
 
-        return self.prior_mean, self.prior_variance, posterior_mu, posterior_sigma, posterior_log_sigma, word_dist, h
+        return self.prior_mean, self.prior_variance, posterior_mu, posterior_sigma, posterior_log_sigma, word_dist, z
 
     def get_theta(self, x, latent_representation):
         with torch.no_grad():

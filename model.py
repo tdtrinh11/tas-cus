@@ -229,7 +229,7 @@ PEGASUS_INPUTS_DOCSTRING = r"""
     PEGASUS_START_DOCSTRING,
 )
 class TAASModel(PegasusPreTrainedModel):
-    def __init__(self, config: PegasusConfig):
+    def __init__(self, config: PegasusConfig, topic_num=1024, t_vocab_size=2000):
         super().__init__(config)
 
         padding_idx, vocab_size = config.pad_token_id, config.vocab_size
@@ -237,6 +237,19 @@ class TAASModel(PegasusPreTrainedModel):
 
         self.encoder = PegasusEncoder(config, self.shared)
         self.decoder = PegasusDecoder(config, self.shared)
+
+        # initial topic model
+        self.topic_num = topic_num
+        # todo: confirm the vocab_size for topic modeling
+        self.topic_model = DecoderNetwork(vocab_size=t_vocab_size, bert_size=config.d_model,
+                                          infnet="combined", num_topics=self.topic_num, model_type='prodLDA',
+                                          hidden_sizes=(100, 100), activation='relu',
+                                          dropout=self.config.dropout, learn_priors=True)
+        # transfer the topic modeling vocab to vocab size
+        self.tm_head = nn.Linear(topic_num, config.d_model, bias=False)
+        self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
+        # for model analysis: use an additional NN to transfer dimension
+        # self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
 
         self.init_weights()
 
@@ -275,6 +288,8 @@ class TAASModel(PegasusPreTrainedModel):
             output_attentions=None,
             output_hidden_states=None,
             return_dict=None,
+            topic_guided=True,
+            bow=None
     ):
 
         # input_ids if no decoder_input_ids are provided
@@ -308,11 +323,33 @@ class TAASModel(PegasusPreTrainedModel):
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
 
+        # topic modeling
+        # topic attention
+        bow = bow.reshape(bow.shape[0], -1)
+
+        # perform topic modeling - use "[CLS]" as the representation
+        prior_mean, prior_variance, posterior_mean, posterior_variance, posterior_log_variance, word_dists, h = self.topic_model( bow, encoder_outputs.last_hidden_state[::, 0])
+
+        # encoder_outputs[0]: [bs, #doc, d_model]
+        if topic_guided:
+            # convert encoder_outputs[0] 
+            # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))
+            _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], h)
+        else:
+            _encoder_hidden_states = encoder_outputs[0]
+
+        # loss for topic modeling
+        if bow.size()[0] < word_dists.size()[0]:
+            self.loss_topic_modeling = 0
+        else:
+            self.loss_topic_modeling = topic_modeling_loss(bow, self.topic_num, word_dists, prior_mean, prior_variance,
+                                                      posterior_mean, posterior_variance, posterior_log_variance)
+
         # decoder outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
-            encoder_hidden_states=encoder_outputs[0],
+            encoder_hidden_states=_encoder_hidden_states,
             encoder_attention_mask=attention_mask,
             past_key_values=past_key_values,
             inputs_embeds=decoder_inputs_embeds,
@@ -358,10 +395,10 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         # initial topic model
         self.topic_num = topic_num
         # todo: confirm the vocab_size for topic modeling
-        self.topic_model = DecoderNetwork(vocab_size=vocab_size, bert_size=config.d_model,
-                                          infnet="combined", num_topics=self.topic_num, model_type='prodLDA',
-                                          hidden_sizes=(100, 100), activation='relu',
-                                          dropout=self.config.dropout, learn_priors=True)
+        # self.topic_model = DecoderNetwork(vocab_size=vocab_size, bert_size=config.d_model,
+        #                                   infnet="combined", num_topics=self.topic_num, model_type='prodLDA',
+        #                                   hidden_sizes=(100, 100), activation='relu',
+        #                                   dropout=self.config.dropout, learn_priors=True)
         # transfer the topic modeling vocab to vocab size
         self.tm_head = nn.Linear(vocab_size, self.model.shared.num_embeddings, bias=False)
         # for model analysis: use an additional NN to transfer dimension
@@ -453,7 +490,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         bow = bow.reshape(bow.shape[0], -1)
 
         # perform topic modeling - use "[CLS]" as the representation
-        prior_mean, prior_variance, posterior_mean, posterior_variance, posterior_log_variance, word_dists, h = self.topic_model(bow, outputs.encoder_last_hidden_state[::, 0])
+        # prior_mean, prior_variance, posterior_mean, posterior_variance, posterior_log_variance, word_dists, h = self.topic_model(bow, outputs.encoder_last_hidden_state[::, 0])
 
         # outputs[0]: if the last hidden state from the decoder_outputs; size: torch.Size([bs, #(summary), d_model])
         # self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)
@@ -469,7 +506,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
 
         if topic_guided:
             # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(self.topic_model.topic_word))
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word))
+            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.model.topic_model.topic_word))
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
@@ -483,11 +520,11 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
             return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
         # loss for topic modeling
-        if bow.size()[0] < word_dists.size()[0]:
-            loss_topic_modeling = 0
-        else:
-            loss_topic_modeling = topic_modeling_loss(bow, self.topic_num, word_dists, prior_mean, prior_variance,
-                                                      posterior_mean, posterior_variance, posterior_log_variance)
+        # if bow.size()[0] < word_dists.size()[0]:
+        #     loss_topic_modeling = 0
+        # else:
+        #     loss_topic_modeling = topic_modeling_loss(bow, self.topic_num, word_dists, prior_mean, prior_variance,
+        #                                               posterior_mean, posterior_variance, posterior_log_variance)
 
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,
@@ -499,7 +536,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
             encoder_last_hidden_state=outputs.encoder_last_hidden_state,
             encoder_hidden_states=outputs.encoder_hidden_states,
             encoder_attentions=outputs.encoder_attentions,
-        ), loss_topic_modeling, self.topic_model.topic_word
+        ), self.model.loss_topic_modeling, self.model.topic_model.topic_word
 
     def prepare_inputs_for_generation(self, decoder_input_ids, past=None, attention_mask=None, use_cache=None,
                                       encoder_outputs=None, **kwargs):
