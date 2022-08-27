@@ -87,7 +87,7 @@ class DecoderNetwork(nn.Module):
         #     self.activation_hidden = nn.Softplus()
         # elif activation == 'relu':
         #     self.activation_hidden = nn.ReLU()
-        self.activation_hidden = nn.ReLU()
+        self.activation_hidden = nn.Softplus()
         self.hiddens = nn.Sequential(OrderedDict([
             ('l_1', nn.Sequential(nn.Linear(num_topics, 100), self.activation_hidden)),
             ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation_hidden)),
