@@ -229,7 +229,7 @@ PEGASUS_INPUTS_DOCSTRING = r"""
     PEGASUS_START_DOCSTRING,
 )
 class TAASModel(PegasusPreTrainedModel):
-    def __init__(self, config: PegasusConfig, topic_num=100, t_vocab_size=2000):
+    def __init__(self, config: PegasusConfig, topic_num=1024, t_vocab_size=2000):
         super().__init__(config)
 
         padding_idx, vocab_size = config.pad_token_id, config.vocab_size
@@ -246,8 +246,9 @@ class TAASModel(PegasusPreTrainedModel):
                                           hidden_sizes=(100, 100), activation='relu',
                                           dropout=self.config.dropout, learn_priors=True)
         # transfer the topic modeling vocab to vocab size
-        self.tm_head = nn.Linear(t_vocab_size, config.d_model, bias=False)
-        self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
+        # self.tm_head = nn.Linear(t_vocab_size, config.d_model, bias=False)
+        self.tm_head = nn.Linear(topic_num, config.d_model, bias=False)
+        # self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
         # for model analysis: use an additional NN to transfer dimension
         # self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
 
@@ -346,7 +347,8 @@ class TAASModel(PegasusPreTrainedModel):
 
         if topic_guided:
             # convert encoder_outputs[0] 
-            _encoder_hidden_states = encoder_outputs[0] + torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))
+            # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))
+            _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], self.tm_head(h))
         else:
             _encoder_hidden_states = encoder_outputs[0]
 
@@ -399,11 +401,12 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         r"lm_head\.weight",
     ]
 
-    def __init__(self, config: PegasusConfig, topic_num=100, t_vocab_size=2000):
+    def __init__(self, config: PegasusConfig, topic_num=1024, t_vocab_size=2000):
         super().__init__(config)
         self.model = TAASModel(config, topic_num=topic_num, t_vocab_size=t_vocab_size)
         self.register_buffer("final_logits_bias", torch.zeros((1, self.model.shared.num_embeddings)))
         self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)
+        self.tm_head = nn.Linear(t_vocab_size, self.model.shared.num_embeddings, bias=False)
 
         # Initialize weights
         self.init_weights()
@@ -515,7 +518,8 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
         '''
 
-        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
+        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.model.topic_model.topic_word))
+        # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
         masked_lm_loss = None
         if labels is not None:
