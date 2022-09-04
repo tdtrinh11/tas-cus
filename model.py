@@ -522,8 +522,8 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
         '''
 
-        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.model.topic_model.topic_word))
-        # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
+        # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(self.model.topic_model.topic_word))
+        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
         masked_lm_loss = None
         if labels is not None:
