@@ -111,7 +111,7 @@ class DecoderNetwork(nn.Module):
         posterior_sigma = torch.exp(posterior_log_sigma)
 
         z = self.reparameterize(posterior_mu, posterior_log_sigma)
-        z = self.hiddens(z)
+        # z = self.hiddens(z)
 
         # generate samples from h - h.size: batch_size * num_topics
         h = F.softmax(z, dim=1)
