@@ -93,6 +93,7 @@ class DecoderNetwork(nn.Module):
             ('l_2', nn.Sequential(nn.Linear(100, 100), self.activation_hidden)),
             ('l_3', nn.Sequential(nn.Linear(100, num_topics), self.activation_hidden))
         ]))
+        self.drop_hiddens = nn.Dropout(p=self.dropout)
 
     @staticmethod
     def reparameterize(mu, logvar):
@@ -112,6 +113,7 @@ class DecoderNetwork(nn.Module):
 
         z = self.reparameterize(posterior_mu, posterior_log_sigma)
         # z = self.hiddens(z)
+        # z = self.drop_hiddens(z)
 
         # generate samples from h - h.size: batch_size * num_topics
         h = F.softmax(z, dim=1)

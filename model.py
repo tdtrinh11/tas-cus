@@ -246,12 +246,12 @@ class TAASModel(PegasusPreTrainedModel):
                                           hidden_sizes=(100, 100), activation='relu',
                                           dropout=self.config.dropout, learn_priors=True)
         # transfer the topic modeling vocab to vocab size
-        # self.tm_head = nn.Linear(t_vocab_size, config.d_model, bias=False)
-        # self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
-
-        self.tm_head = nn.Linear(topic_num, config.d_model, bias=False)
-        self.tm_head_2 = nn.Linear(1, config.d_model, bias=False)
+        self.tm_head = nn.Linear(t_vocab_size, config.d_model, bias=False)
         self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
+
+        # self.tm_head = nn.Linear(topic_num, config.d_model, bias=False)
+        # self.tm_head_2 = nn.Linear(1, config.d_model, bias=False)
+        # self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
 
         # for model analysis: use an additional NN to transfer dimension
         # self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
@@ -351,8 +351,8 @@ class TAASModel(PegasusPreTrainedModel):
 
         if topic_guided:
             # convert encoder_outputs[0] 
-            # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))
-            _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], self.tm_head_2(torch.unsqueeze(self.tm_head(h), dim=-1)))
+            _encoder_hidden_states = encoder_outputs[0] + torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))
+            # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], self.tm_head_2(torch.unsqueeze(self.tm_head(h), dim=-1)))
         else:
             _encoder_hidden_states = encoder_outputs[0]
 
