@@ -351,7 +351,7 @@ class TAASModel(PegasusPreTrainedModel):
 
         if topic_guided:
             # convert encoder_outputs[0] 
-            _encoder_hidden_states = encoder_outputs[0] + torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(word_dists))
+            _encoder_hidden_states = torch.cat(encoder_outputs[0], torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word)), -1)
             # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], self.tm_head_2(torch.unsqueeze(self.tm_head(h), dim=-1)))
         else:
             _encoder_hidden_states = encoder_outputs[0]
