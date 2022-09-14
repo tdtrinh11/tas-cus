@@ -19,6 +19,7 @@
 """ PyTorch PEGASUS model."""
 
 
+from audioop import bias
 import math
 import os
 import random
@@ -248,6 +249,7 @@ class TAASModel(PegasusPreTrainedModel):
         # transfer the topic modeling vocab to vocab size
         self.tm_head = nn.Linear(t_vocab_size, config.d_model, bias=False)
         self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
+        self.tm_head_2 = nn.Linear(config.d_model + config.d_model, config.d_model, bias=False)
 
         # self.tm_head = nn.Linear(topic_num, config.d_model, bias=False)
         # self.tm_head_2 = nn.Linear(1, config.d_model, bias=False)
@@ -351,7 +353,7 @@ class TAASModel(PegasusPreTrainedModel):
 
         if topic_guided:
             # convert encoder_outputs[0] 
-            _encoder_hidden_states = torch.cat((encoder_outputs[0], torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))), -1)
+            _encoder_hidden_states = self.tm_head_2(torch.cat((encoder_outputs[0], torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))), -1))
             # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], self.tm_head_2(torch.unsqueeze(self.tm_head(h), dim=-1)))
         else:
             _encoder_hidden_states = encoder_outputs[0]
