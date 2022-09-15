@@ -249,6 +249,10 @@ class TAASModel(PegasusPreTrainedModel):
         self.tm_head = nn.Linear(t_vocab_size, config.d_model, bias=False)
         self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
 
+        # dropout on att
+        self.drop_att = nn.Dropout(p=self.config.dropout)
+        # dropout on h
+        self.drop_h = nn.Dropout(p=self.config.dropout)
         # self.tm_head = nn.Linear(topic_num, config.d_model, bias=False)
         # self.tm_head_2 = nn.Linear(1, config.d_model, bias=False)
         # self.lm_head = nn.Linear(config.d_model, topic_num, bias=False)
@@ -349,9 +353,14 @@ class TAASModel(PegasusPreTrainedModel):
 
         # encoder_outputs[0]: [bs, #doc, d_model]
 
+        scores = torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word))
+        scores = F.softmax(scores, axis=-1)
+        scores = self.drop_att(scores)
+
+
         if topic_guided:
             # convert encoder_outputs[0] 
-            _encoder_hidden_states = torch.cat(encoder_outputs[0], torch.matmul(self.lm_head(encoder_outputs[0]), self.tm_head(self.topic_model.topic_word)), -1)
+            _encoder_hidden_states = encoder_outputs[0] + scores
             # _encoder_hidden_states = encoder_outputs[0] + torch.matmul(encoder_outputs[0], self.tm_head_2(torch.unsqueeze(self.tm_head(h), dim=-1)))
         else:
             _encoder_hidden_states = encoder_outputs[0]
