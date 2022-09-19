@@ -359,7 +359,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         self.topic_num = topic_num
         # todo: confirm the vocab_size for topic modeling
         self.topic_model = DecoderNetwork(vocab_size=vocab_size, bert_size=config.d_model,
-                                          infnet="zeroshot", num_topics=self.topic_num, model_type='prodLDA',
+                                          infnet="combined", num_topics=self.topic_num, model_type='prodLDA',
                                           hidden_sizes=(100, 100), activation='relu',
                                           dropout=self.config.dropout, learn_priors=True)
         # transfer the topic modeling vocab to vocab size
@@ -466,12 +466,12 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
 
         # lm_logits.size(): torch.Size([16, 38, 50264]) => batch_size * #(summary) * len(vocab)
         # theta = self.topic_model.get_theta(bow, outputs.encoder_last_hidden_state[::, 0])
+        # F.softmax(self.reparameterize(posterior_mu, posterior_log_sigma), dim=1)
 
         if topic_guided:
             #     lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(
             #         self.topic_model.topic_word))
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(outputs[0], self.tm_head(
-                self.topic_model.topic_word))
+            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + F.softmax(torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word)), dim=1)
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
