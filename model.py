@@ -471,7 +471,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         if topic_guided:
             #     lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(
             #         self.topic_model.topic_word))
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + F.softmax(torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word)), dim=1)
+            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + F.softmax(torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word)), dim=-1)
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
