@@ -363,7 +363,7 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
                                           hidden_sizes=(100, 100), activation='relu',
                                           dropout=self.config.dropout, learn_priors=True)
         # transfer the topic modeling vocab to vocab size
-        self.tm_head = nn.Linear(vocab_size, self.model.shared.num_embeddings, bias=False)
+        self.tm_head = nn.Linear(vocab_size, config.d_model, bias=False)
         # for model analysis: use an additional NN to transfer dimension
         # self.dimhead = nn.Linear(config.d_model, self.topic_num, bias=False)
 
@@ -471,7 +471,9 @@ class TAASForConditionalGeneration(PegasusPreTrainedModel):
         if topic_guided:
             #     lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + torch.matmul(self.dimhead(outputs[0]), self.tm_head(
             #         self.topic_model.topic_word))
-            lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + F.softmax(torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word)), dim=-1)
+            outputs_att = F.softmax( torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word)), dim=-1 ) + outputs[0]
+            lm_logits = self.lm_head(outputs_att) + self.final_logits_bias 
+            # lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias + F.softmax(torch.matmul(outputs[0], self.tm_head(self.topic_model.topic_word)), dim=-1)
         else:
             lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
